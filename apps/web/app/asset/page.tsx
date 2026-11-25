@@ -31,7 +31,7 @@ import {
   statusOf,
 } from "@/components/ui";
 import { assetFromSearch } from "@/lib/asset-query";
-import { config, explorer } from "@/lib/config";
+import { EXTERNAL_REL, config, explorer } from "@/lib/config";
 import { embedCode } from "@/lib/badge";
 import {
   contracts,
@@ -206,8 +206,8 @@ function AssetDetail() {
             </>
           }
           sub={
-            <a href={explorer.contract(asset.sac)} target="_blank" rel="noreferrer">
-              explorer
+            <a href={explorer.contract(asset.sac)} target="_blank" rel={EXTERNAL_REL}>
+              View on Stellar Expert
             </a>
           }
         />
@@ -325,7 +325,7 @@ function ReportRow({
           className={name ? "mono sub" : "mono"}
           href={explorer.account(report.reporter)}
           target="_blank"
-          rel="noreferrer"
+          rel={EXTERNAL_REL}
         >
           {shortAddress(report.reporter)}
         </a>{" "}

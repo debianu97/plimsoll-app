@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ago, shortAddress, type IndexerReporter } from "@plimsoll/sdk";
 import { Skeleton, nowSecs } from "@/components/ui";
-import { config, explorer } from "@/lib/config";
+import { EXTERNAL_REL, config, explorer } from "@/lib/config";
 import { indexer, loadReporters } from "@/lib/data";
 import { groupReporters, updatedAt } from "@/lib/reporters";
 
@@ -114,8 +114,8 @@ export default function ReportersPage() {
                           className="mono"
                           href={explorer.account(reporter.address)}
                           target="_blank"
-                          rel="noreferrer"
-                          title={reporter.address}
+                          rel={EXTERNAL_REL}
+                          title={`${reporter.address} on Stellar Expert`}
                         >
                           {shortAddress(reporter.address, 8)}
                         </a>
