@@ -6,6 +6,7 @@ import { ago, shortAddress, type IndexerReporter } from "@plimsoll/sdk";
 import { Skeleton, nowSecs } from "@/components/ui";
 import { EXTERNAL_REL, config, explorer } from "@/lib/config";
 import { indexer, loadReporters } from "@/lib/data";
+import { reporterHref } from "@/lib/reporter-profile";
 import { groupReporters, updatedAt } from "@/lib/reporters";
 
 export default function ReportersPage() {
@@ -108,7 +109,11 @@ export default function ReportersPage() {
                   const at = updatedAt(reporter.updated_at);
                   return (
                     <tr key={reporter.address}>
-                      <td>{reporter.name || "—"}</td>
+                      <td>
+                        <Link href={reporterHref(reporter.address)}>
+                          {reporter.name || shortAddress(reporter.address, 6)}
+                        </Link>
+                      </td>
                       <td>
                         <a
                           className="mono"

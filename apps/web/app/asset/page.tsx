@@ -31,6 +31,7 @@ import {
   statusOf,
 } from "@/components/ui";
 import { assetFromSearch } from "@/lib/asset-query";
+import { reporterHref } from "@/lib/reporter-profile";
 import { EXTERNAL_REL, config, explorer } from "@/lib/config";
 import { embedCode } from "@/lib/badge";
 import {
@@ -320,7 +321,11 @@ function ReportRow({
             underneath, so the claim stays checkable against the ledger. An
             issuer signs with its own account and is not a registered reporter,
             so it has no name here and keeps the note it always had. */}
-        {name ? <div>{name}</div> : null}
+        {name ? (
+          <div>
+            <Link href={reporterHref(report.reporter)}>{name}</Link>
+          </div>
+        ) : null}
         <a
           className={name ? "mono sub" : "mono"}
           href={explorer.account(report.reporter)}
