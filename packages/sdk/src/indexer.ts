@@ -31,6 +31,28 @@ export interface IndexerReport {
   source?: IndexerSource;
 }
 
+/** A report from a reporter's history, which spans assets, so it names its asset. */
+export interface IndexerReporterReport extends IndexerReport {
+  sac: string;
+}
+
+/** Filters and paging for {@link IndexerClient.reporterReports}. */
+export interface ReporterReportsQuery {
+  /** Page size; the indexer caps it. */
+  limit?: number;
+  /** Only reports posted strictly before this ledger. Pass the previous page's `nextBefore`. */
+  before?: number;
+  /** Only reports on this asset contract. */
+  asset?: string;
+}
+
+/** One page of a reporter's reports, newest first. */
+export interface ReporterReportsPage {
+  reports: IndexerReporterReport[];
+  /** Pass as `before` for the next older page; null when there are no more. */
+  nextBefore: number | null;
+}
+
 export interface IndexerCoverage {
   bps: number | null;
   ratio: string | null;
@@ -177,6 +199,28 @@ export class IndexerClient {
   async reporters(opts?: RequestOptions): Promise<IndexerReporter[]> {
     const body = await this.get<{ reporters: IndexerReporter[] }>(`/v1/reporters`, opts);
     return body.reporters;
+  }
+
+  /**
+   * GET /v1/reporters/{address}/reports: every report the reporter posted,
+   * across all assets, newest first. Walk older pages by passing `nextBefore`
+   * back as `before`.
+   */
+  async reporterReports(
+    address: string,
+    query: ReporterReportsQuery = {},
+    opts?: RequestOptions,
+  ): Promise<ReporterReportsPage> {
+    const params = new URLSearchParams();
+    if (query.limit !== undefined) params.set("limit", String(query.limit));
+    if (query.before !== undefined) params.set("before", String(query.before));
+    if (query.asset) params.set("asset", query.asset);
+    const qs = params.toString();
+    const body = await this.get<{ reports: IndexerReporterReport[]; next_before?: number | null }>(
+      `/v1/reporters/${encodeURIComponent(address)}/reports${qs ? `?${qs}` : ""}`,
+      opts,
+    );
+    return { reports: body.reports, nextBefore: body.next_before ?? null };
   }
 
   network(opts?: RequestOptions): Promise<IndexerNetwork> {
