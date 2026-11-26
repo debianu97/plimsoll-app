@@ -16,6 +16,14 @@
   --muted-bg: #ecebe6;
   --sea: #1d4e73;
   --sea-bg: #e5eef5;
+  /* History chart. Axis text is >= 4.5:1 and lines/gridlines >= 3:1
+     against --chart-surface, in both themes. */
+  --chart-surface: #ffffff;
+  --chart-grid: #8c877d;
+  --chart-axis: #44515f;
+  --chart-line: #1d4e73;
+  --chart-point: #1d4e73;
+  --chart-ref: #17734a;
   --radius: 10px;
   --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
   --sans:
@@ -43,6 +51,12 @@
     --muted-bg: #1b2b3b;
     --sea: #8cc4ef;
     --sea-bg: #142f45;
+    --chart-surface: #142230;
+    --chart-grid: #5d7488;
+    --chart-axis: #b4c0cc;
+    --chart-line: #8cc4ef;
+    --chart-point: #8cc4ef;
+    --chart-ref: #5fd39a;
     color-scheme: dark;
   }
 }
@@ -864,6 +878,15 @@ pre {
 .stack-bar span {
   display: block;
   height: 100%;
+}
+.chart {
+  background: var(--chart-surface);
+  border: 1px solid var(--chart-grid);
+  border-radius: var(--radius);
+  padding: 8px;
+}
+.chart svg {
+  background: transparent;
 }
 .legend {
   list-style: none;
