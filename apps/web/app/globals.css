@@ -424,6 +424,55 @@ main {
   flex-wrap: wrap;
 }
 
+/* breadcrumbs */
+.breadcrumbs {
+  margin: 0 0 10px;
+  font-size: 0.88rem;
+}
+.breadcrumbs ol {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.breadcrumbs li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.breadcrumbs li + li::before {
+  content: "/";
+  color: var(--ink-3);
+}
+.breadcrumbs a {
+  color: var(--ink-2);
+}
+.breadcrumbs a:hover {
+  color: var(--ink);
+}
+.breadcrumbs [aria-current="page"] {
+  color: var(--ink-3);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.breadcrumbs .crumb-gap {
+  display: none;
+}
+@media (max-width: 480px) {
+  .breadcrumbs li[data-middle="true"] {
+    display: none;
+  }
+  .breadcrumbs .crumb-gap {
+    display: flex;
+  }
+}
+
 /* pills */
 .pill {
   display: inline-flex;

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ago, shortAddress, type IndexerReporter } from "@plimsoll/sdk";
+import { Breadcrumb } from "@/components/Breadcrumb";
 import { Skeleton, nowSecs } from "@/components/ui";
 import { config, explorer } from "@/lib/config";
 import { indexer, loadReporters } from "@/lib/data";
@@ -34,6 +35,7 @@ export default function ReportersPage() {
 
   return (
     <>
+      <Breadcrumb items={[{ label: "Home", href: "/" }, { label: "Reporters" }]} />
       <div className="eyebrow">Reporter registry</div>
       <h1>Reporters</h1>
       <p className="sub" style={{ maxWidth: 680 }}>
