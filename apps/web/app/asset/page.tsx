@@ -49,6 +49,8 @@ import {
   type Origin,
   type ReportView,
 } from "@/lib/data";
+import { useAutoRefresh, useRefreshIntervalSetting } from "@/lib/refresh-interval";
+import { RefreshControls } from "@/components/RefreshControls";
 
 export default function AssetPage() {
   return (
@@ -69,95 +71,27 @@ function AssetContent({ query }: { query: ReturnType<typeof assetFromSearch> }) 
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(nowSecs());
   const [names, setNames] = useState<ReadonlyMap<string, string>>(new Map());
-  // Bumped when the event stream says a new figure has landed, which re-runs
-  // the read below without discarding what is already on screen.
-  const [refresh, setRefresh] = useState(0);
+  const [intervalValue, setIntervalValue] = useRefreshIntervalSetting();
+  const cancelRef = useRef<(() => void) | null>(null);
 
-  const [watcher, setWatcher] = useState<string | null>(null);
-  const [walletStatus, setWalletStatus] = useState<string | null>(null);
-  const [connecting, setConnecting] = useState(false);
-  const [selected, setSelected] = useState<ReportView | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const inFlight = useRef(false);
-  const dialog = useRef<HTMLDialogElement>(null);
-  const cancelButton = useRef<HTMLButtonElement>(null);
-  const [outcome, setOutcome] = useState<{ hash: string } | { error: string } | null>(null);
-
-  useEffect(() => {
-    const address = connectedWalletAddress();
-    if (!address) return;
-    let current = true;
-    contracts.getReporter(address).then(
-      (reporter) => {
-        if (current && reporter?.role === Role.Watcher && connectedWalletAddress() === address)
-          setWatcher(address);
-      },
-      () => undefined,
-    );
-    return () => {
-      current = false;
-    };
-  }, []);
-
-  async function connectWatcher() {
-    setConnecting(true);
-    setWalletStatus(null);
-    try {
-      const address = await connectWallet(true);
-      const reporter = await contracts.getReporter(address);
-      if (reporter?.role === Role.Watcher) setWatcher(address);
-      else setWalletStatus("This wallet is not registered as a watcher.");
-    } catch (e) {
-      setWalletStatus(e instanceof Error ? e.message : String(e));
-    } finally {
-      setConnecting(false);
-    }
-  }
-
-  useEffect(() => {
-    if (!selected || !dialog.current) return;
-    dialog.current.showModal();
-    cancelButton.current?.focus();
-  }, [selected]);
-
-  async function dispute() {
-    if (!selected || !watcher || !asset || asset.sac !== sac || inFlight.current) return;
-    inFlight.current = true;
-    setSubmitting(true);
-    setOutcome(null);
-    try {
-      const address = await connectWallet();
-      if (address !== watcher || (await contracts.getReporter(address))?.role !== Role.Watcher) {
-        setWatcher(null);
-        throw new Error("Connect a registered watcher wallet to dispute this report.");
-      }
-      const xdr = await contracts.prepareDisputeReport(address, sac, selected.asOf);
-      const hash = await contracts.submit(await signXdr(xdr, address));
-      setOutcome({ hash });
-    } catch (e) {
-      setOutcome({ error: e instanceof Error ? e.message : String(e) });
-    } finally {
-      inFlight.current = false;
-      setSubmitting(false);
-      dialog.current?.close();
-    }
-  }
-
-  useEffect(() => {
+  const fetch = useCallback(() => {
     if (!sac) return;
+    if (cancelRef.current) cancelRef.current();
     let cancelled = false;
+    cancelRef.current = () => {
+      cancelled = true;
+    };
     loadAsset(sac)
       .then((a) => {
         if (cancelled) return;
         setAsset(a);
         setNow(nowSecs());
+        setError(null);
         if (!a) return;
         const addresses = Object.values(a.reports)
           .filter((r): r is ReportView => r !== undefined)
           .map((r) => r.reporter);
         if (a.supply) addresses.push(a.supply.poster);
-        // Names are an improvement on the addresses already shown, not a
-        // precondition for them, so a failed lookup leaves the page as it is.
         loadReporterNames(addresses)
           .then((n) => {
             if (!cancelled) setNames(n);
@@ -167,10 +101,9 @@ function AssetContent({ query }: { query: ReturnType<typeof assetFromSearch> }) 
       .catch((e: unknown) => {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
       });
-    return () => {
-      cancelled = true;
-    };
-  }, [sac, refresh]);
+  }, [sac]);
+
+  const { refresh } = useAutoRefresh(fetch, intervalValue, sac);
 
   if (!query.ok) {
     return (
@@ -249,17 +182,16 @@ function AssetContent({ query }: { query: ReturnType<typeof assetFromSearch> }) 
             {asset.toml?.org_name ? <> · {asset.toml.org_name}</> : null}
           </div>
         </div>
-        <div className="row">
-          <StatusPill status={status} />
-          {c ? <TierPill tier={c.tier} /> : null}
-          <button
-            type="button"
-            className="secondary no-print"
-            onClick={() => window.print()}
-            style={{ marginLeft: "auto" }}
-          >
-            Print
-          </button>
+        <div className="row" style={{ gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
+          <RefreshControls
+            interval={intervalValue}
+            onChange={setIntervalValue}
+            onRefresh={refresh}
+          />
+          <div className="row">
+            <StatusPill status={status} />
+            {c ? <TierPill tier={c.tier} /> : null}
+          </div>
         </div>
       </div>
 

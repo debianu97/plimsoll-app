@@ -1,38 +1,41 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { AssetCard } from "@/components/AssetCard";
 import { Skeleton, nowSecs } from "@/components/ui";
 import { config } from "@/lib/config";
 import { loadAssets, type AssetView } from "@/lib/data";
-import { usePrefetchAssets } from "@/lib/prefetch";
+import { useAutoRefresh, useRefreshIntervalSetting } from "@/lib/refresh-interval";
+import { RefreshControls } from "@/components/RefreshControls";
 
 export default function Home() {
   const [assets, setAssets] = useState<AssetView[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(nowSecs());
+  const [intervalValue, setIntervalValue] = useRefreshIntervalSetting();
+  const cancelRef = useRef<(() => void) | null>(null);
 
-  useEffect(() => {
+  const fetch = useCallback(() => {
+    if (cancelRef.current) cancelRef.current();
     let cancelled = false;
+    cancelRef.current = () => {
+      cancelled = true;
+    };
     loadAssets()
       .then((list) => {
         if (!cancelled) {
           setAssets(list);
           setNow(nowSecs());
+          setError(null);
         }
       })
       .catch((err: unknown) => {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));
       });
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
-  // Stable array reference: only recomputed when the assets list changes.
-  const topSacs = useMemo(() => assets?.map((a) => a.sac) ?? [], [assets]);
-  usePrefetchAssets(topSacs);
+  const { refresh } = useAutoRefresh(fetch, intervalValue);
 
   const source = assets?.[0]?.source;
 
@@ -50,13 +53,20 @@ export default function Home() {
 
       <div className="spread mt">
         <h2 style={{ margin: 0 }}>Listed assets</h2>
-        <span className="sub">
-          {source === "indexer"
-            ? "Read from the Plimsoll indexer"
-            : source === "chain"
-              ? `Read directly from the coverage ledger on ${config.networkName}`
-              : null}
-        </span>
+        <div className="row" style={{ gap: 12, alignItems: "center" }}>
+          <span className="sub">
+            {source === "indexer"
+              ? "Read from the Plimsoll indexer"
+              : source === "chain"
+                ? `Read directly from the coverage ledger on ${config.networkName}`
+                : null}
+          </span>
+          <RefreshControls
+            interval={intervalValue}
+            onChange={setIntervalValue}
+            onRefresh={refresh}
+          />
+        </div>
       </div>
 
       {error ? (
