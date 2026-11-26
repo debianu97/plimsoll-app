@@ -10,6 +10,7 @@ import {
   sha256Hex,
   shortAddress,
   tierLabel,
+  validateDocUri,
 } from "@plimsoll/sdk";
 import { CopyButton } from "@/components/ui";
 import { explorer } from "@/lib/config";
@@ -92,10 +93,12 @@ export default function ReportPage() {
   const selected = assets.find((a) => a.sac === sac);
   const amountCheck = checkAmount(amount, selected?.supply?.amount, selected?.code);
   const preview = amountCheck.kind === "valid" ? amountCheck.preview : null;
+  const docUriCheck = docUri.trim() ? validateDocUri(docUri) : null;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!address || !tier || amountCheck.kind !== "valid" || preview?.warning) return;
+    if (!docUriCheck?.valid) return;
     try {
       const units = amountCheck.units;
       const asOfSecs = Math.floor(new Date(`${asOf}T00:00:00Z`).getTime() / 1000);
@@ -106,7 +109,7 @@ export default function ReportPage() {
         amount: units,
         asOf: asOfSecs,
         docHash,
-        docUri,
+        docUri: docUriCheck.uri,
       });
       setStatus({ kind: "busy", msg: "Waiting for your signature…" });
       const signed = await signXdr(xdr, address);
@@ -125,7 +128,7 @@ export default function ReportPage() {
     sac &&
     amountCheck.kind === "valid" &&
     !preview?.warning &&
-    docUri &&
+    docUriCheck?.valid &&
     /^[0-9a-f]{64}$/.test(docHash) &&
     status.kind !== "busy";
 
@@ -249,7 +252,14 @@ export default function ReportPage() {
             placeholder="https://…"
             required
             maxLength={256}
+            aria-invalid={docUriCheck !== null && !docUriCheck.valid}
+            aria-describedby={docUriCheck && !docUriCheck.valid ? "doc-uri-error" : undefined}
           />
+          {docUriCheck && !docUriCheck.valid ? (
+            <span className="field-error" id="doc-uri-error" role="alert">
+              {docUriCheck.message}
+            </span>
+          ) : null}
         </label>
         <div>
           <label>

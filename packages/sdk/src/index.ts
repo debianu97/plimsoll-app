@@ -6,5 +6,6 @@ export * from "./events";
 export * from "./vault";
 export * from "./indexer";
 export * from "./verify";
+export * from "./doc-uri";
 export { TESTNET } from "./networks";
 export * from "./horizon";
