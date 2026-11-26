@@ -155,6 +155,12 @@ export interface IndexerWebhook {
   created_at: string;
 }
 
+/** What the indexer reports after firing a test payload at a webhook. */
+export interface IndexerWebhookTestResult {
+  /** HTTP status the webhook receiver answered with. */
+  status: number;
+}
+
 export interface RegisterWebhookParams {
   url: string;
   threshold_bps: number;
@@ -273,6 +279,18 @@ export class IndexerClient {
         throw new IndexerError(res.status, message);
       }
     });
+  }
+
+  /**
+   * Fires a synthetic test payload (`event_type: "test"`) at a registered
+   * webhook, so a receiver can be checked without waiting for a real event.
+   * Resolves with the status the receiver answered; a receiver that answers
+   * 500 is still a resolved call, so check `status`. Rejects with an
+   * {@link IndexerError}: 404 for an unknown webhook or an indexer without this
+   * endpoint, 429 when the webhook was tested in the last minute.
+   */
+  async testWebhook(id: string, opts?: RequestOptions): Promise<IndexerWebhookTestResult> {
+    return this.post<IndexerWebhookTestResult>("/v1/webhooks/test", { id }, opts);
   }
 
   /** Raw breakdown bytes, exactly as hashed on-chain. */
