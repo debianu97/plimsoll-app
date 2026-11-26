@@ -108,24 +108,28 @@ function ensureKit(): Promise<{ kit: Kit; options: WalletOption[] }> {
   return kitPromise;
 }
 
+export function connectedWalletAddress(): string | null {
+  return connection?.address ?? null;
+}
+
 /** Ask the user which wallet to use, then connect it. */
-export function connectWallet(): Promise<string> {
+export function connectWallet(chooseAnother = false): Promise<string> {
   if (!connecting) {
-    connecting = connectOnce().finally(() => {
+    connecting = connectOnce(chooseAnother).finally(() => {
       connecting = null;
     });
   }
   return connecting;
 }
 
-async function connectOnce(): Promise<string> {
+async function connectOnce(chooseAnother: boolean): Promise<string> {
   if (typeof window === "undefined" || typeof document === "undefined") {
     throw new WalletError("Wallets can only be connected in a browser.");
   }
 
   const { kit: wallets, options } = await ensureKit();
 
-  if (connection) {
+  if (connection && !chooseAnother) {
     const mismatch = await checkNetwork(connection.module, connection.name);
     if (mismatch) {
       await wallets.disconnect().catch(() => undefined);
@@ -137,6 +141,11 @@ async function connectOnce(): Promise<string> {
 
   const choice = await pickWallet(options);
   if (!choice) throw new WalletError("No wallet was connected.");
+
+  if (connection) {
+    await wallets.disconnect();
+    connection = null;
+  }
 
   try {
     wallets.setWallet(choice.id);

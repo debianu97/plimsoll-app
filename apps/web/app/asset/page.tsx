@@ -3,8 +3,9 @@
 import { safeHref } from "@/lib/safe-href";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import {
+  Role,
   Tier,
   ago,
   checkStellarToml,
@@ -34,6 +35,7 @@ import {
 import { LiveUpdates } from "@/components/LiveUpdates";
 import { assetFromSearch } from "@/lib/asset-query";
 import { config, explorer } from "@/lib/config";
+import { connectWallet, connectedWalletAddress, signXdr } from "@/lib/wallet";
 import { embedCode } from "@/lib/badge";
 import { RECONCILE_DOCS, reconcileSummary, reconcileTime } from "@/lib/reconcile";
 import {
@@ -56,6 +58,10 @@ export default function AssetPage() {
 
 function AssetDetail() {
   const query = assetFromSearch(useSearchParams().toString(), config.network.networkPassphrase);
+  return <AssetContent key={query.ok ? query.sac : ""} query={query} />;
+}
+
+function AssetContent({ query }: { query: ReturnType<typeof assetFromSearch> }) {
   const sac = query.ok ? query.sac : "";
   const [asset, setAsset] = useState<AssetView | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
@@ -64,6 +70,76 @@ function AssetDetail() {
   // Bumped when the event stream says a new figure has landed, which re-runs
   // the read below without discarding what is already on screen.
   const [refresh, setRefresh] = useState(0);
+
+  const [watcher, setWatcher] = useState<string | null>(null);
+  const [walletStatus, setWalletStatus] = useState<string | null>(null);
+  const [connecting, setConnecting] = useState(false);
+  const [selected, setSelected] = useState<ReportView | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const inFlight = useRef(false);
+  const dialog = useRef<HTMLDialogElement>(null);
+  const cancelButton = useRef<HTMLButtonElement>(null);
+  const [outcome, setOutcome] = useState<{ hash: string } | { error: string } | null>(null);
+
+  useEffect(() => {
+    const address = connectedWalletAddress();
+    if (!address) return;
+    let current = true;
+    contracts.getReporter(address).then(
+      (reporter) => {
+        if (current && reporter?.role === Role.Watcher && connectedWalletAddress() === address)
+          setWatcher(address);
+      },
+      () => undefined,
+    );
+    return () => {
+      current = false;
+    };
+  }, []);
+
+  async function connectWatcher() {
+    setConnecting(true);
+    setWalletStatus(null);
+    try {
+      const address = await connectWallet(true);
+      const reporter = await contracts.getReporter(address);
+      if (reporter?.role === Role.Watcher) setWatcher(address);
+      else setWalletStatus("This wallet is not registered as a watcher.");
+    } catch (e) {
+      setWalletStatus(e instanceof Error ? e.message : String(e));
+    } finally {
+      setConnecting(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!selected || !dialog.current) return;
+    dialog.current.showModal();
+    cancelButton.current?.focus();
+  }, [selected]);
+
+  async function dispute() {
+    if (!selected || !watcher || !asset || asset.sac !== sac || inFlight.current) return;
+    inFlight.current = true;
+    setSubmitting(true);
+    setOutcome(null);
+    try {
+      const address = await connectWallet();
+      if (address !== watcher || (await contracts.getReporter(address))?.role !== Role.Watcher) {
+        setWatcher(null);
+        throw new Error("Connect a registered watcher wallet to dispute this report.");
+      }
+      const xdr = await contracts.prepareDisputeReport(address, sac, selected.asOf);
+      const hash = await contracts.submit(await signXdr(xdr, address));
+      setOutcome({ hash });
+    } catch (e) {
+      setOutcome({ error: e instanceof Error ? e.message : String(e) });
+    } finally {
+      inFlight.current = false;
+      setSubmitting(false);
+      dialog.current?.close();
+    }
+  }
 
   useEffect(() => {
     if (!sac) return;
@@ -229,7 +305,24 @@ function AssetDetail() {
         />
       </div>
 
-      <h2>Reserve reports</h2>
+      <div className="spread">
+        <h2>Reserve reports</h2>
+        {!watcher && Object.values(asset.reports).some(Boolean) ? (
+          <button
+            type="button"
+            className="secondary"
+            onClick={connectWatcher}
+            disabled={connecting}
+          >
+            {connecting ? "Checking wallet…" : "Connect watcher wallet"}
+          </button>
+        ) : null}
+      </div>
+      {walletStatus ? (
+        <p className="sub" role="status">
+          {walletStatus}
+        </p>
+      ) : null}
       <p className="sub">
         Latest report per signer tier. Coverage uses the freshest one. Each report carries the
         SHA-256 of its source document, so you can check the file has not changed.
@@ -244,6 +337,7 @@ function AssetDetail() {
               <th>As of</th>
               <th>Signed by</th>
               <th>Document</th>
+              {watcher ? <th scope="col">Actions</th> : null}
             </tr>
           </thead>
           <tbody>
@@ -257,11 +351,12 @@ function AssetDetail() {
                   issuer={asset.issuer}
                   now={now}
                   name={names.get(r.reporter)}
+                  onDispute={watcher && asset.sac === sac ? () => setSelected(r) : undefined}
                 />
               ) : (
                 <tr key={tier}>
                   <td>{tierLabel(tier)}</td>
-                  <td colSpan={5} className="sub">
+                  <td colSpan={watcher ? 6 : 5} className="sub">
                     No report at this tier.
                   </td>
                 </tr>
@@ -269,6 +364,73 @@ function AssetDetail() {
             })}
           </tbody>
         </table>
+      </div>
+
+      <dialog
+        ref={dialog}
+        className="wallet-dialog"
+        aria-labelledby="dispute-title"
+        onClose={() => setSelected(null)}
+        onCancel={(event) => {
+          if (inFlight.current) event.preventDefault();
+        }}
+      >
+        <div className="wallet-dialog-head">
+          <h2 id="dispute-title">Dispute reserve report</h2>
+        </div>
+        {selected ? (
+          <div className="wallet-dialog-body">
+            <dl>
+              <dt>Asset</dt>
+              <dd>
+                {asset.code} <code className="break">{asset.sac}</code>
+              </dd>
+              <dt>Tier</dt>
+              <dd>{tierLabel(selected.tier)}</dd>
+              <dt>Reserves</dt>
+              <dd>{formatUnits(selected.amount)}</dd>
+              <dt>As of (UTC)</dt>
+              <dd>{new Date(selected.asOf * 1000).toISOString()}</dd>
+              <dt>Reporter</dt>
+              <dd>
+                <code className="break">{selected.reporter}</code>
+              </dd>
+            </dl>
+            <div className="row">
+              <button
+                ref={cancelButton}
+                type="button"
+                className="secondary"
+                disabled={submitting}
+                onClick={() => dialog.current?.close()}
+              >
+                Cancel
+              </button>
+              <button type="button" disabled={submitting} onClick={dispute}>
+                {submitting ? "Submitting dispute…" : "Confirm dispute"}
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </dialog>
+      <div className="dispute-toast" aria-live="polite">
+        {outcome ? (
+          <div className={`notice ${"hash" in outcome ? "notice-ok" : "notice-bad"}`}>
+            {"hash" in outcome ? (
+              <>
+                Dispute submitted.{" "}
+                <a href={explorer.tx(outcome.hash)} target="_blank" rel="noreferrer">
+                  View transaction
+                </a>
+              </>
+            ) : (
+              <>Dispute failed. {outcome.error}</>
+            )}{" "}
+            <button type="button" className="secondary" onClick={() => setOutcome(null)}>
+              Dismiss
+            </button>
+          </div>
+        ) : null}
       </div>
 
       {asset.supply ? (
@@ -313,12 +475,14 @@ function ReportRow({
   issuer,
   now,
   name,
+  onDispute,
 }: {
   report: ReportView;
   supply: bigint | undefined;
   issuer: string;
   now: number;
   name?: string;
+  onDispute?: () => void;
 }) {
   const covers =
     supply && supply > 0n ? bpsToPercent(Number((report.amount * 10_000n) / supply)) : "—";
@@ -373,6 +537,18 @@ function ReportRow({
           </span>
         )}
       </td>
+      {onDispute ? (
+        <td>
+          <button
+            type="button"
+            className="secondary"
+            onClick={onDispute}
+            aria-label={`Dispute ${tierLabel(report.tier)} report`}
+          >
+            Dispute
+          </button>
+        </td>
+      ) : null}
     </tr>
   );
 }

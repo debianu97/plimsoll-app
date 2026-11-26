@@ -939,3 +939,17 @@ pre {
     font-size: 11pt;
   }
 }
+
+.dispute-toast {
+  position: fixed;
+  z-index: 30;
+  inset-inline-end: 1rem;
+  inset-block-end: 1rem;
+  width: min(26rem, calc(100% - 2rem));
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+.dispute-toast > .notice {
+  pointer-events: auto;
+  box-shadow: 0 4px 20px rgb(0 0 0 / 20%);
+}

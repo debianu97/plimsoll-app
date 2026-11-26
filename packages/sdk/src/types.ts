@@ -10,6 +10,7 @@ export enum Role {
   Auditor = 1,
   Transcriber = 2,
   SupplyPoster = 3,
+  Watcher = 4,
 }
 
 export interface NetworkConfig {
