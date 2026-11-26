@@ -1077,6 +1077,53 @@ pre {
     display: none !important;
   }
 
+  /* Asset detail page print styles */
+  .asset-print {
+    display: block;
+  }
+  .asset-print-only {
+    display: block !important;
+  }
+  .asset-print-hide {
+    display: none !important;
+  }
+
+  /* Gauge as static bar in print */
+  .gauge-print {
+    display: block;
+    height: 20px;
+    border-radius: 4px;
+    background: var(--muted-bg);
+    overflow: hidden;
+    margin-top: 8px;
+  }
+  .gauge-print-fill {
+    height: 100%;
+    border-radius: 4px;
+  }
+  .gauge-print-fill.covered {
+    background: var(--ok);
+  }
+  .gauge-print-fill.under {
+    background: var(--bad);
+  }
+  .gauge-print-fill.stale,
+  .gauge-print-fill.unknown {
+    background: var(--ink-3);
+  }
+
+  /* Tables print without horizontal overflow */
+  .table-wrap {
+    overflow-x: visible;
+  }
+
+  /* Cards without shadows/borders in print */
+  .card {
+    border: 1px solid #ccc;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
   body {
     background: #fff;
     color: #000;

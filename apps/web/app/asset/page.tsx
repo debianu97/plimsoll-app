@@ -252,6 +252,14 @@ function AssetContent({ query }: { query: ReturnType<typeof assetFromSearch> }) 
         <div className="row">
           <StatusPill status={status} />
           {c ? <TierPill tier={c.tier} /> : null}
+          <button
+            type="button"
+            className="secondary no-print"
+            onClick={() => window.print()}
+            style={{ marginLeft: "auto" }}
+          >
+            Print
+          </button>
         </div>
       </div>
 
@@ -270,10 +278,18 @@ function AssetContent({ query }: { query: ReturnType<typeof assetFromSearch> }) 
                 : "Needs both a supply snapshot and a reserve report."}
             </div>
           </div>
-          <LiveCheck sac={asset.sac} />
+          <div className="asset-print-hide"><LiveCheck sac={asset.sac} /></div>
         </div>
         <div className="mt">
           <Gauge bps={c?.bps} status={status} />
+          {c ? (
+            <div className="gauge-print asset-print-only" aria-hidden="true">
+              <div
+                className={`gauge-print-fill ${status}`}
+                style={{ width: `${Math.min((c.bps / 12500) * 100, 100)}%` }}
+              />
+            </div>
+          ) : null}
         </div>
       </section>
 
@@ -452,7 +468,7 @@ function AssetContent({ query }: { query: ReturnType<typeof assetFromSearch> }) 
       <h2>What the issuer publishes</h2>
       <IssuerToml asset={asset} />
 
-      <EmbedBadge sac={asset.sac} />
+      <div className="asset-print-hide"><EmbedBadge sac={asset.sac} /></div>
     </>
   );
 }
